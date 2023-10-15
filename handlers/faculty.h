@@ -9,8 +9,7 @@ Description : To implement faculty functionalities.
 
 
 #include <sys/ipc.h>
-#include <sys/sem.h>
-#include <time.h>
+
 
 struct Faculty loggedInFaculty;
 

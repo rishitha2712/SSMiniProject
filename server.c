@@ -21,10 +21,10 @@ Description : Server Side Program
 
 #include "./handlers/admin.h"
 #include "./handlers/faculty.h"
+#include "./handlers/student.h"
 
 
-
-#define INITIAL_PROMPT "\t.......... Welcome Back To Academia :: Course Registration..........\nLogin Type\nEnter Your Choice {1.Admin, 2.Faculty, 3.Student}:"
+#define INITIAL_PROMPT "\n\t.......... Welcome Back To Academia :: Course Registration..........\nLogin Type\nEnter Your Choice {1.Admin, 2.Faculty, 3.Student}:"
 
 
 int handle_client(int csfd) {
@@ -48,7 +48,7 @@ int handle_client(int csfd) {
                 faculty_handler(csfd);
                 break;
         case 3:
-                //student_handler(csfd);
+                student_handler(csfd);
                 break;         
         default:
                 write(csfd,"Invalid Choice ^",14);

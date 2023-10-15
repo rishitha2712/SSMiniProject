@@ -175,6 +175,7 @@ bool login_handler(int user, int cfd, struct Faculty *f,struct Student *s)
     if(userfound)
     {
         bzero(wr, sizeof(wr));
+        bzero(rd, sizeof(rd));
         wrb = write(cfd, "Enter Password:",15);
         if (wrb == -1)
         {
@@ -202,7 +203,7 @@ bool login_handler(int user, int cfd, struct Faculty *f,struct Student *s)
                 return true;
             }
         }
-        else{
+        else if(user==3){
             if (strcmp(rd, "stu") == 0)
             {
                 *s = student;
