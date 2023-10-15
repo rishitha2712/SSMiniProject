@@ -320,8 +320,8 @@ int activate_student(int cfd){
 int log_out(int cfd){
     ssize_t rdb, wrb;             
     char rd[1024], wr[1024]; 
-    char temp[1024];
-    write(cfd,"Logged out Successfully ^",sizeof("Logged out Successfully ^"));
+    write(cfd,"You have been logged out successfully ^",sizeof("""You have been logged out successfully ^"));
+    write(cfd,"^",1);
     close(cfd);
     return 0;
 
@@ -336,7 +336,7 @@ int get_student_details(int cfd)
     int sfd;
     struct flock lock = {F_RDLCK, SEEK_SET, 0, sizeof(struct Student), getpid()};
 
-    wrb = write(cfd,"Enter student id:" , 16);
+    wrb = write(cfd,"Enter student id:" , 17);
     if (wrb == -1){
         perror("Error while writing to client");
         return false;
@@ -347,8 +347,7 @@ int get_student_details(int cfd)
         perror("Error reading student ID");
         return false;
     }
-    int studentID = atoi(rd);
-
+    
     sfd = open("student", O_RDONLY);
     if (sfd == -1)
     {
@@ -364,12 +363,19 @@ int get_student_details(int cfd)
         return 0;
     }
 
-
+    char *position = strstr(rd, "MT-");
+    char *start = NULL;
+    int studentID;
+    if(position!=NULL) {
+        start = position + strlen("MT-");
+        studentID = atoi(start);
+        
+    }
     
-    int offset = lseek(sfd, (studentID-1) * sizeof(struct Student), SEEK_SET);
+    off_t offset = lseek(sfd, (studentID-1) * sizeof(struct Student), SEEK_SET);
     if (offset == -1)
     {
-        perror("Error while seeking to required customer record!");
+        perror("Error while seeking to student record ");
         return false;
     }
 
@@ -398,7 +404,7 @@ int get_student_details(int cfd)
     wrb = write(cfd, wr, strlen(wr));
     if (wrb == -1)
     {
-        perror("Error writing student info to client!");
+        perror("Error writing student info");
         return false;
     }
     rdb = read(cfd,rd,sizeof(rd)); 
@@ -427,7 +433,7 @@ int get_faculty_details(int cfd)
         perror("Error reading faculty ID");
         return false;
     }
-    int facultyID = atoi(rd);
+  
 
     ffd = open("faculty", O_RDONLY);
     if (ffd == -1)
@@ -444,9 +450,16 @@ int get_faculty_details(int cfd)
         rdb = read(cfd,rd,sizeof(rd));
         return 0;
     }
-
+    char *position = strstr(rd, "F-");
+    char *start = NULL;
+    int facultyID;
+    if(position!=NULL) {
+        start = position + strlen("F-");
+        facultyID = atoi(start);
+        
+    }
     
-    int offset = lseek(ffd, (facultyID-1) * sizeof(struct Faculty), SEEK_SET);
+    off_t offset = lseek(ffd, (facultyID-1) * sizeof(struct Faculty), SEEK_SET);
     lock.l_start = offset;
 
     int status = fcntl(ffd, F_SETLKW, &lock);
@@ -604,7 +617,7 @@ int add_student(int cfd)
 
     
     strcpy(newStudent.access,"activated");
-    strcpy(newStudent.password, "abw92wnsa");
+    strcpy(newStudent.password, "stu");
 
     
     sfd = open("student", O_CREAT|O_APPEND|O_WRONLY,S_IRWXU);
@@ -631,7 +644,7 @@ int add_student(int cfd)
         perror("Error displaying login details");
         return 0;
     }
-    rdb = read(cfd,rd,sizeof(rd)); //dummy read
+    rdb = read(cfd,rd,sizeof(rd)); 
     return newStudent.id;
 }
 
@@ -736,7 +749,7 @@ int add_faculty(int cfd)
     strcat(newFaculty.login_id, "-");
     sprintf(wr, "%d", newFaculty.id);
     strcat(newFaculty.login_id, wr);
-    strcpy(newFaculty.password, "s8j7dnbe");
+    strcpy(newFaculty.password, "fac");
 
 
     ffd = open("faculty", O_CREAT|O_APPEND|O_WRONLY,S_IRWXU);

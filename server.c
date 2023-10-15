@@ -20,6 +20,8 @@ Description : Server Side Program
 
 
 #include "./handlers/admin.h"
+#include "./handlers/faculty.h"
+
 
 
 #define INITIAL_PROMPT "\t.......... Welcome Back To Academia :: Course Registration..........\nLogin Type\nEnter Your Choice {1.Admin, 2.Faculty, 3.Student}:"
@@ -43,7 +45,7 @@ int handle_client(int csfd) {
                 admin_handler(csfd);
                 break;
         case 2:
-                //faculty_handler(csfd);
+                faculty_handler(csfd);
                 break;
         case 3:
                 //student_handler(csfd);
@@ -66,7 +68,7 @@ int main(){
 	int sfd=socket(AF_INET,SOCK_STREAM,0);
 	server.sin_family=AF_INET;    
 	server.sin_addr.s_addr=INADDR_ANY; 
-	server.sin_port=htons(8085);
+	server.sin_port=htons(8009);
 	int bs = bind(sfd,(struct sockaddr *)&server,sizeof(server));
 	if(bs==-1)
 	{
@@ -83,7 +85,7 @@ int main(){
 	while(1){
 		int clisize = sizeof(client);
 		int cfd=accept(sfd,(struct sockaddr *)&client,&clisize);
-		printf("Connected with client");
+		printf("Connected with client\n");
 		if(!fork()){
 			close(sfd);
 			handle_client(cfd);

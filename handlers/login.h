@@ -16,7 +16,6 @@ Description : To check credentials
 #include <fcntl.h>     
 #include <stdlib.h>    
 #include <errno.h>     
-#include <crypt.h>
 
 
 #include "../student.h"
@@ -44,7 +43,7 @@ bool login_handler(int user, int cfd, struct Faculty *f,struct Student *s)
     wrb = write(cfd, wr, strlen(wr));
     if (wrb == -1)
     {
-        perror("Error while writing!");
+        perror("Error while writing");
         return false;
     }
 
@@ -72,9 +71,9 @@ bool login_handler(int user, int cfd, struct Faculty *f,struct Student *s)
         int id;
 
         char *start = NULL;
-        char *position = strstr(temp,"Fac-");
+        char *position = strstr(temp,"F-");
         if (position != NULL) {
-           start = position + strlen("Fac-");
+           start = position + strlen("F-");
            id = atoi(start);
         } 
 
@@ -197,14 +196,14 @@ bool login_handler(int user, int cfd, struct Faculty *f,struct Student *s)
         }
         else if(user==2)
         {
-            if (strcmp(rd, faculty.password) == 0)
+            if (strcmp(rd, "fac") == 0)
             {
                 *f = faculty;
                 return true;
             }
         }
         else{
-            if (strcmp(rd, student.password) == 0)
+            if (strcmp(rd, "stu") == 0)
             {
                 *s = student;
                 return true;
@@ -212,14 +211,14 @@ bool login_handler(int user, int cfd, struct Faculty *f,struct Student *s)
         }
          
         bzero(wr, sizeof(wr));        
-        wrb = write(cfd, "Invalid Credentials", 19);
+        wrb = write(cfd, "Invalid Credentials ^", 21);
         rdb = read(cfd,rd,sizeof(rd));
         return 0;
     }
     else
     {
         bzero(wr, sizeof(wr));
-        wrb = write(cfd,"Invalid Login ID",16);
+        wrb = write(cfd,"Invalid Login ID ^",18);
         rdb = read(cfd,rd,sizeof(rd));
         return 0;
     }
