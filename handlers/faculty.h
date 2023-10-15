@@ -86,6 +86,147 @@ int faculty_handler(int cfd){
 }
 
 
+int add_course(int cfd){
+    ssize_t rdb, wrb;
+    char rd[1000], wr[1000];
+    struct Course newCourse;
+    struct Course prevCourse;
+
+
+    int coursefd = open("course", O_RDONLY);
+    if (coursefd == -1 && errno == ENOENT)
+    {
+        newCourse.id =1;
+    }
+    else if (coursefd == -1)
+    {
+        perror("Error while opening course file");
+        return 0;
+    }
+    else
+    {
+        int offset = lseek(coursefd, -sizeof(struct Course), SEEK_END);
+        if (offset == -1)
+        {
+            perror("Error seeking to last Course record!");
+            return 0;
+        }
+
+        struct flock lock = {F_RDLCK, SEEK_SET, offset, sizeof(struct Course), getpid()};
+        int status = fcntl(coursefd, F_SETLKW, &lock);
+        if (status == -1)
+        {
+            perror("Error obtaining read lock");
+            return 0;
+        }
+
+        rdb = read(coursefd, &prevCourse, sizeof(struct Course));
+        if (rdb == -1)
+        {
+            perror("Error while reading Course");
+            return 0;
+        }
+
+        lock.l_type = F_UNLCK;
+        fcntl(coursefd, F_SETLK, &lock);
+
+        close(coursefd);
+
+        newCourse.id = prevCourse.id+1;
+    }
+
+    
+    wrb = write(cfd,"Enter course name:",strlen("Enter course name:"));
+    if (wrb == -1)
+    {
+        perror("Error writing message to client");
+        return 0;
+    }
+
+    bzero(rd, sizeof(rd));
+    rdb = read(cfd, &rd, sizeof(rd));
+    if (rdb == -1)
+    {
+        perror("Error reading course name");
+        return 0;
+    }
+
+    strcpy(newCourse.name,rd);
+
+
+    wrb = write(cfd,"Enter no.of total seats:",strlen("Enter no.of total seats:"));
+    if (wrb == -1)
+    {
+        perror("Error writing message to client");
+        return 0;
+    }
+
+    bzero(rd, sizeof(rd));
+    rdb = read(cfd, &rd, sizeof(rd));
+    if (rdb == -1)
+    {
+        perror("Error reading no of seats");
+        return 0;
+    }
+    int seats = atoi(rd);
+    newCourse.no_of_seats= seats;
+
+
+    
+    wrb = write(cfd,"Enter credits:",strlen("Enter Credits:"));
+    if (wrb == -1)
+    {
+        perror("Error writing message to client");
+        return 0;
+    }
+
+    bzero(rd, sizeof(rd));
+    rdb = read(cfd, &rd, sizeof(rd));
+    if (rdb == -1)
+    {
+        perror("Error reading credits");
+        return 0;
+    }
+    int credits = atoi(rd);
+    newCourse.credits= credits;
+     
+    newCourse.no_of_available_seats=seats;
+
+    char code[10];
+    strcpy(newCourse.courseid,"C-");
+    sprintf(code ,"%d",newCourse.id);
+    strcat(newCourse.courseid, code);
+
+    strcpy(newCourse.facultyid,loggedInFaculty.login_id);
+
+    strcpy(newCourse.status,"active");
+    
+    coursefd = open("course", O_CREAT|O_APPEND|O_WRONLY,S_IRWXU);
+    if (coursefd == -1)
+    {
+        perror("Error while creating course file!");
+        return 0;
+    }
+
+    wrb = write(coursefd, &newCourse, sizeof(struct Course));
+    if (wrb == -1)
+    {
+        perror("Error while writing Course");
+        return 0;
+    }
+
+    close(coursefd);
+    bzero(wr, sizeof(wr));
+    
+    sprintf(wr, "%s%s%d", "^ Course added successfully\n The courseid is: ", newCourse.courseid,newCourse.id);
+    wrb = write(cfd, wr, sizeof(wr));
+    
+    rdb = read(cfd,rd,sizeof(rd));
+    return 1;
+}
+
+
+
 int remove_course(int cfd){
     
     ssize_t rdb, wrb;
@@ -432,144 +573,5 @@ int logout(int cfd){
     return 0;
 }
 
-
-int add_course(int cfd){
-    ssize_t rdb, wrb;
-    char rd[1000], wr[1000];
-    struct Course newCourse;
-    struct Course prevCourse;
-
-
-    int coursefd = open("course", O_RDONLY);
-    if (coursefd == -1 && errno == ENOENT)
-    {
-        newCourse.id =1;
-    }
-    else if (coursefd == -1)
-    {
-        perror("Error while opening course file");
-        return 0;
-    }
-    else
-    {
-        int offset = lseek(coursefd, -sizeof(struct Course), SEEK_END);
-        if (offset == -1)
-        {
-            perror("Error seeking to last Course record!");
-            return 0;
-        }
-
-        struct flock lock = {F_RDLCK, SEEK_SET, offset, sizeof(struct Course), getpid()};
-        int status = fcntl(coursefd, F_SETLKW, &lock);
-        if (status == -1)
-        {
-            perror("Error obtaining read lock");
-            return 0;
-        }
-
-        rdb = read(coursefd, &prevCourse, sizeof(struct Course));
-        if (rdb == -1)
-        {
-            perror("Error while reading Course");
-            return 0;
-        }
-
-        lock.l_type = F_UNLCK;
-        fcntl(coursefd, F_SETLK, &lock);
-
-        close(coursefd);
-
-        newCourse.id = prevCourse.id+1;
-    }
-
-    
-    wrb = write(cfd,"Enter course name:",strlen("Enter course name:"));
-    if (wrb == -1)
-    {
-        perror("Error writing message to client");
-        return 0;
-    }
-
-    bzero(rd, sizeof(rd));
-    rdb = read(cfd, &rd, sizeof(rd));
-    if (rdb == -1)
-    {
-        perror("Error reading course name");
-        return 0;
-    }
-
-    strcpy(newCourse.name,rd);
-
-
-    wrb = write(cfd,"Enter no.of total seats:",strlen("Enter no.of total seats:"));
-    if (wrb == -1)
-    {
-        perror("Error writing message to client");
-        return 0;
-    }
-
-    bzero(rd, sizeof(rd));
-    rdb = read(cfd, &rd, sizeof(rd));
-    if (rdb == -1)
-    {
-        perror("Error reading no of seats");
-        return 0;
-    }
-    int seats = atoi(rd);
-    newCourse.no_of_seats= seats;
-
-
-    
-    wrb = write(cfd,"Enter credits:",strlen("Enter Credits:"));
-    if (wrb == -1)
-    {
-        perror("Error writing message to client");
-        return 0;
-    }
-
-    bzero(rd, sizeof(rd));
-    rdb = read(cfd, &rd, sizeof(rd));
-    if (rdb == -1)
-    {
-        perror("Error reading credits");
-        return 0;
-    }
-    int credits = atoi(rd);
-    newCourse.credits= credits;
-     
-    newCourse.no_of_available_seats=seats;
-
-    char code[10];
-    strcpy(newCourse.courseid,"C-");
-    sprintf(code ,"%d",newCourse.id);
-    strcat(newCourse.courseid, code);
-
-    strcpy(newCourse.facultyid,loggedInFaculty.login_id);
-
-    strcpy(newCourse.status,"active");
-    
-    coursefd = open("course", O_CREAT|O_APPEND|O_WRONLY,S_IRWXU);
-    if (coursefd == -1)
-    {
-        perror("Error while creating course file!");
-        return 0;
-    }
-
-    wrb = write(coursefd, &newCourse, sizeof(struct Course));
-    if (wrb == -1)
-    {
-        perror("Error while writing Course");
-        return 0;
-    }
-
-    close(coursefd);
-    bzero(wr, sizeof(wr));
-    
-    sprintf(wr, "%s%s%d", "^ Course added successfully\n The courseid is: ", newCourse.courseid,newCourse.id);
-    wrb = write(cfd, wr, sizeof(wr));
-    
-    rdb = read(cfd,rd,sizeof(rd));
-    return 1;
-}
 
 

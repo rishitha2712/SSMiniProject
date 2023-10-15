@@ -36,7 +36,7 @@ int student_handler(int cfd){
         while(1){
 
             strcat(wr, "\n");
-            strcat(wr, "......Welcome to Student Menu......\n\t1.View All Courses\n\t2.Enroll new course\n\t3.Drop course\n\t4.View enrolled course details\n\t5.Change password\n\t6.Logout and Exit\n\nEnter your choice:"
+            strcat(wr, "......Welcome to Student Menu......\n\t1.View All Courses\n\t2.Enroll new course\n\t3.Drop course\n\t4.View enrolled course details\n\t5.Change password\n\t6.Logout\n\nEnter your choice:"
 );
             wrb = write(cfd, wr, strlen(wr));
             bzero(wr, sizeof(wr));
@@ -80,235 +80,6 @@ int student_handler(int cfd){
         return 0;
     }
     return 1;
-}
-
-int drop_course(int cfd){
-
-  ssize_t rdb, wrb;             
-  char rd[1000], wr[10000];
-  int efd, coursefd;
-  bool flag;
-  struct Enrollment enroll;
-  struct Course course;
-  int enrollID,n;
-  struct flock lock = {F_WRLCK, SEEK_SET, 0, sizeof(struct Enrollment), getpid()};
-  
-  if(strcmp(loggedInStudent.access,"blocked")==0){
-    write(cfd,"You are blocked by admin ^",26);
-    rdb = read(cfd,rd,sizeof(rd));
-    return 0;
-  }
-
- 
-  wrb = write(cfd,"Enter the course id you want to drop:",37);
-  rdb = read(cfd,rd,sizeof(rd));
-  if(rdb==-1){
-    perror("Error reading course id");
-    return 0;
-  }
-  
-  efd = open("enroll",O_RDONLY);
-  while((n = read(efd, &enroll, sizeof(struct Enrollment))) > 0) {
-    if((strcmp(enroll.status,"enrolled")==0) && (strcmp(enroll.studentid,loggedInStudent.login_id)==0) && (strcmp(enroll.courseid,rd)==0)){              
-        enrollID= enroll.id;
-        flag=true;
-        break;  
-    }
-  }
-  close(efd);
-  
-  if(flag==false){
-    write(cfd,"Invalid course id ^",19);
-    rdb = read(cfd,rd,sizeof(rd));
-    return 0;
-  } 
-
-
-  efd = open("enroll",O_RDONLY);
-  int offset = lseek(efd,(enrollID-1)*sizeof(struct Enrollment),SEEK_SET);
-  if (offset == -1){
-    perror("Error while seeking");
-    return 0;
-  }
-
-  lock.l_type = F_RDLCK;
-  lock.l_start = offset;
-  int status = fcntl(efd, F_SETLKW, &lock);
-  if (status == -1){
-      perror("Error while obtaining read lock");
-      return 0;
-  }
-  rdb = read(efd, &enroll, sizeof(struct Enrollment));
-  if(rdb == -1){
-    perror("Error while reading enrollment");
-    return 0;
-  }
-
-  if(strcmp(enroll.status,"unenrolled")==0){
-      write(cfd,"Not enrolled in course already ^",sizeof("Not enrolled in course already ^"));
-      rdb = read(cfd,rd,sizeof(rd));
-      return 0;
-  }
-  lock.l_type = F_UNLCK;
-  status = fcntl(coursefd, F_SETLK, &lock);   
-  close(efd);
-
-  strcpy(enroll.status,"unenrolled");
-  
-  efd = open("enroll",O_WRONLY);
-  if (efd == -1){
-        perror("Error while opening enrollment file");
-        return 0;
-  }
-
-  offset = lseek(efd, (enrollID-1) * sizeof(struct Enrollment), SEEK_SET);
-  if(offset == -1){
-    perror("Error while seeking");
-    return 0;
-  }
-
-  lock.l_type = F_WRLCK;
-  lock.l_start = offset;
-  status = fcntl(efd, F_SETLKW, &lock);
-  if(status == -1){
-    perror("Error obtaining write lock");
-    return 0;
-  }
-  wrb = write(efd, &enroll, sizeof(struct Enrollment));
-  if (wrb == -1){
-    perror("Error updating enroll");
-  }
-
-  lock.l_type = F_UNLCK;
-  fcntl(efd, F_SETLKW, &lock);
-  close(efd);
-  
-  int courseID;
-  coursefd = open("course",O_RDONLY);
-  while((n = read(coursefd, &course, sizeof(struct Course))) > 0) {
-    if((strcmp(course.status,"notactive")!=0) && (strcmp(course.courseid,rd)==0)){              
-        courseID= course.id;
-        break;  
-    }
-  }
-  close(coursefd);
-  
-  coursefd = open("course",O_RDONLY);
-  offset = lseek(coursefd,(courseID-1)*sizeof(struct Course),SEEK_SET);
-  if (offset == -1){
-    perror("Error while seeking");
-    return 0;
-  }
-  lock.l_type = F_RDLCK;
-  lock.l_start = offset;
-  status = fcntl(coursefd, F_SETLKW, &lock);
-  if (status == -1){
-      perror("Error while obtaining read lock");
-      return 0;
-  }
-  rdb = read(coursefd, &course, sizeof(struct Course));
-  if(rdb == -1){
-    perror("Error while reading course");
-    return 0;
-  }
-  lock.l_type = F_UNLCK;
-  status = fcntl(coursefd, F_SETLK, &lock);   
-  close(efd);
-
-
-  course.no_of_available_seats=course.no_of_available_seats+1;
-  
-  coursefd = open("course",O_WRONLY);
-  if (coursefd == -1){
-        perror("Error while opening course file");
-        return 0;
-  }
-  offset = lseek(coursefd, (courseID-1) * sizeof(struct Course), SEEK_SET);
-  if(offset == -1){
-    perror("Error while seeking");
-    return 0;
-  }
-  lock.l_type = F_WRLCK;
-  lock.l_start = offset;
-  status = fcntl(coursefd, F_SETLKW, &lock);
-  if(status == -1){
-    perror("Error while obtaining write lock");
-    return 0;
-  }
-  wrb = write(coursefd, &course, sizeof(struct Course));
-  if (wrb == -1){
-    perror("Error while writing");
-  }
-
-  lock.l_type = F_UNLCK;
-  fcntl(coursefd, F_SETLKW, &lock);
-  close(coursefd);
-
-  
-  wrb = write(cfd,"You have unenrolled successfully ^",strlen("You have unenrolled successfully ^"));
-  if(wrb == -1){
-      perror("Error writing message to client");
-      return false;
-  }
-  rdb = read(cfd,rd,sizeof(rd));
-  return 0;
-}
-
-int view_enrolled_courses(int cfd){
-    ssize_t rdb, wrb;             
-    char rd[1000], wr[10000]; 
-    char temp[1000];
-    char temp1[5][10];
-    int i,n;
-    int efd;
-    int coursefd;
-    struct Enrollment enroll;
-    struct Course course;
-    bool flag;
-    
-
-    if(strcmp(loggedInStudent.access,"blocked")==0){
-       write(cfd,"You are blocked by admin ^",26);
-       rdb = read(cfd,rd,sizeof(rd));
-       return 0;
-    }
-
-    efd = open("enroll",O_RDONLY);
-    while((n = read(efd, &enroll, sizeof(struct Enrollment))) > 0) {
-        if((strcmp(enroll.status,"enrolled")==0) && (strcmp(enroll.studentid,loggedInStudent.login_id)==0)){              
-           flag=true;
-           strcpy(temp1[i],enroll.courseid);
-           i++;   
-        }
-    }
-
-    
-    if(flag==false){
-       write(cfd,"No enrolled courses ^",21);
-       rdb = read(cfd,rd,sizeof(rd));  
-    }
-
-    bool stat[20]={false};
-
-    for(int i=0;i<5;i++){
-        coursefd = open("course",O_RDONLY);
-        while((n = read(coursefd, &course, sizeof(struct Course))) > 0) {
-            if(stat[course.id]==false && (strcmp(course.status,"notactive")!=0) && (strcmp(course.courseid,temp1[i])==0)){                 
-                bzero(wr,sizeof(wr));
-                stat[course.id]=true;   
-                sprintf(wr, " ^ ********* Course Details *********  \n\tName: %s\n\tNo of Seats: %d\n\tCredits : %d\n\tNo of available seats: %d\n\tCourse-id: %s\n", course.name, course.no_of_seats,course.credits,course.no_of_available_seats,course.courseid);
-                wrb = write(cfd, wr, strlen(wr));
-                if(wrb == -1){
-                    perror("Error writing course");
-                    return 0;
-                }
-                rdb = read(cfd,rd,sizeof(rd));  
-                break;
-            } 
-        }
-        close(coursefd);
-    }
-    return 1;   
 }
 
 
@@ -656,6 +427,238 @@ int view_all_courses(int cfd){
     rdb = read(cfd,rd,sizeof(rd));  
     return 1;   
 }
+
+
+int drop_course(int cfd){
+
+  ssize_t rdb, wrb;             
+  char rd[1000], wr[10000];
+  int efd, coursefd;
+  bool flag;
+  struct Enrollment enroll;
+  struct Course course;
+  int enrollID,n;
+  struct flock lock = {F_WRLCK, SEEK_SET, 0, sizeof(struct Enrollment), getpid()};
+  
+  if(strcmp(loggedInStudent.access,"blocked")==0){
+    write(cfd,"You are blocked by admin ^",26);
+    rdb = read(cfd,rd,sizeof(rd));
+    return 0;
+  }
+
+ 
+  wrb = write(cfd,"Enter the course id you want to drop:",37);
+  rdb = read(cfd,rd,sizeof(rd));
+  if(rdb==-1){
+    perror("Error reading course id");
+    return 0;
+  }
+  
+  efd = open("enroll",O_RDONLY);
+  while((n = read(efd, &enroll, sizeof(struct Enrollment))) > 0) {
+    if((strcmp(enroll.status,"enrolled")==0) && (strcmp(enroll.studentid,loggedInStudent.login_id)==0) && (strcmp(enroll.courseid,rd)==0)){              
+        enrollID= enroll.id;
+        flag=true;
+        break;  
+    }
+  }
+  close(efd);
+  
+  if(flag==false){
+    write(cfd,"Invalid course id ^",19);
+    rdb = read(cfd,rd,sizeof(rd));
+    return 0;
+  } 
+
+
+  efd = open("enroll",O_RDONLY);
+  int offset = lseek(efd,(enrollID-1)*sizeof(struct Enrollment),SEEK_SET);
+  if (offset == -1){
+    perror("Error while seeking");
+    return 0;
+  }
+
+  lock.l_type = F_RDLCK;
+  lock.l_start = offset;
+  int status = fcntl(efd, F_SETLKW, &lock);
+  if (status == -1){
+      perror("Error while obtaining read lock");
+      return 0;
+  }
+  rdb = read(efd, &enroll, sizeof(struct Enrollment));
+  if(rdb == -1){
+    perror("Error while reading enrollment");
+    return 0;
+  }
+
+  if(strcmp(enroll.status,"unenrolled")==0){
+      write(cfd,"Not enrolled in course already ^",sizeof("Not enrolled in course already ^"));
+      rdb = read(cfd,rd,sizeof(rd));
+      return 0;
+  }
+  lock.l_type = F_UNLCK;
+  status = fcntl(coursefd, F_SETLK, &lock);   
+  close(efd);
+
+  strcpy(enroll.status,"unenrolled");
+  
+  efd = open("enroll",O_WRONLY);
+  if (efd == -1){
+        perror("Error while opening enrollment file");
+        return 0;
+  }
+
+  offset = lseek(efd, (enrollID-1) * sizeof(struct Enrollment), SEEK_SET);
+  if(offset == -1){
+    perror("Error while seeking");
+    return 0;
+  }
+
+  lock.l_type = F_WRLCK;
+  lock.l_start = offset;
+  status = fcntl(efd, F_SETLKW, &lock);
+  if(status == -1){
+    perror("Error obtaining write lock");
+    return 0;
+  }
+  wrb = write(efd, &enroll, sizeof(struct Enrollment));
+  if (wrb == -1){
+    perror("Error updating enroll");
+  }
+
+  lock.l_type = F_UNLCK;
+  fcntl(efd, F_SETLKW, &lock);
+  close(efd);
+  
+  int courseID;
+  coursefd = open("course",O_RDONLY);
+  while((n = read(coursefd, &course, sizeof(struct Course))) > 0) {
+    if((strcmp(course.status,"notactive")!=0) && (strcmp(course.courseid,rd)==0)){              
+        courseID= course.id;
+        break;  
+    }
+  }
+  close(coursefd);
+  
+  coursefd = open("course",O_RDONLY);
+  offset = lseek(coursefd,(courseID-1)*sizeof(struct Course),SEEK_SET);
+  if (offset == -1){
+    perror("Error while seeking");
+    return 0;
+  }
+  lock.l_type = F_RDLCK;
+  lock.l_start = offset;
+  status = fcntl(coursefd, F_SETLKW, &lock);
+  if (status == -1){
+      perror("Error while obtaining read lock");
+      return 0;
+  }
+  rdb = read(coursefd, &course, sizeof(struct Course));
+  if(rdb == -1){
+    perror("Error while reading course");
+    return 0;
+  }
+  lock.l_type = F_UNLCK;
+  status = fcntl(coursefd, F_SETLK, &lock);   
+  close(efd);
+
+
+  course.no_of_available_seats=course.no_of_available_seats+1;
+  
+  coursefd = open("course",O_WRONLY);
+  if (coursefd == -1){
+        perror("Error while opening course file");
+        return 0;
+  }
+  offset = lseek(coursefd, (courseID-1) * sizeof(struct Course), SEEK_SET);
+  if(offset == -1){
+    perror("Error while seeking");
+    return 0;
+  }
+  lock.l_type = F_WRLCK;
+  lock.l_start = offset;
+  status = fcntl(coursefd, F_SETLKW, &lock);
+  if(status == -1){
+    perror("Error while obtaining write lock");
+    return 0;
+  }
+  wrb = write(coursefd, &course, sizeof(struct Course));
+  if (wrb == -1){
+    perror("Error while writing");
+  }
+
+  lock.l_type = F_UNLCK;
+  fcntl(coursefd, F_SETLKW, &lock);
+  close(coursefd);
+
+  
+  wrb = write(cfd,"You have unenrolled successfully ^",strlen("You have unenrolled successfully ^"));
+  if(wrb == -1){
+      perror("Error writing message to client");
+      return false;
+  }
+  rdb = read(cfd,rd,sizeof(rd));
+  return 0;
+}
+
+int view_enrolled_courses(int cfd){
+    ssize_t rdb, wrb;             
+    char rd[1000], wr[10000]; 
+    char temp[1000];
+    char temp1[5][10];
+    int i,n;
+    int efd;
+    int coursefd;
+    struct Enrollment enroll;
+    struct Course course;
+    bool flag;
+    
+
+    if(strcmp(loggedInStudent.access,"blocked")==0){
+       write(cfd,"You are blocked by admin ^",26);
+       rdb = read(cfd,rd,sizeof(rd));
+       return 0;
+    }
+
+    efd = open("enroll",O_RDONLY);
+    while((n = read(efd, &enroll, sizeof(struct Enrollment))) > 0) {
+        if((strcmp(enroll.status,"enrolled")==0) && (strcmp(enroll.studentid,loggedInStudent.login_id)==0)){              
+           flag=true;
+           strcpy(temp1[i],enroll.courseid);
+           i++;   
+        }
+    }
+
+    
+    if(flag==false){
+       write(cfd,"No enrolled courses ^",21);
+       rdb = read(cfd,rd,sizeof(rd));  
+    }
+
+    bool stat[20]={false};
+
+    for(int i=0;i<5;i++){
+        coursefd = open("course",O_RDONLY);
+        while((n = read(coursefd, &course, sizeof(struct Course))) > 0) {
+            if(stat[course.id]==false && (strcmp(course.status,"notactive")!=0) && (strcmp(course.courseid,temp1[i])==0)){                 
+                bzero(wr,sizeof(wr));
+                stat[course.id]=true;   
+                sprintf(wr, " ^ ********* Course Details *********  \n\tName: %s\n\tNo of Seats: %d\n\tCredits : %d\n\tNo of available seats: %d\n\tCourse-id: %s\n", course.name, course.no_of_seats,course.credits,course.no_of_available_seats,course.courseid);
+                wrb = write(cfd, wr, strlen(wr));
+                if(wrb == -1){
+                    perror("Error writing course");
+                    return 0;
+                }
+                rdb = read(cfd,rd,sizeof(rd));  
+                break;
+            } 
+        }
+        close(coursefd);
+    }
+    return 1;   
+}
+
+
 
 
 int Logout(int cfd){

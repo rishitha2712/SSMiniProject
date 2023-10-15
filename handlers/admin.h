@@ -96,404 +96,6 @@ int admin_handler(int cfd)
     return 1;
 }
 
-
-
-int block_student(int cfd){
-    ssize_t rdb, wrb; 
-    int status,sfd;
-    char rd[1024], wr[1024],temp[1024];
-    struct Student student;
-    struct flock lock = {F_WRLCK, SEEK_SET, 0, sizeof(struct Student), getpid()};
-    wrb = write(cfd,"Enter student id to block:",strlen("Enter student id to block:"));
-    if(wrb==-1){
-        perror("Error writing to client");
-        return 0;
-    }
-
-    rdb = read(cfd,rd,sizeof(rd));
-    if(rdb==-1){
-        perror("Error reading student id");
-        return 0;
-    }
-
-    char *position = strstr(rd, "MT-");
-    char *start = NULL;
-    int studentID;
-
-    if(position!=NULL) {
-        start = position + strlen("MT-");
-        studentID = atoi(start);
-    }
-    else{
-        write(cfd,"Invalid student ID ^",sizeof("Invalid student ID ^"));
-        rdb = read(cfd,rd,sizeof(rd));
-        return 0;
-    }
-
-    
-    sfd = open("student",O_RDONLY);
-    int offset = lseek(sfd,(studentID-1)*sizeof(struct Student),SEEK_SET);
-    if(offset == -1){
-        perror("Error");
-    }
-    lock.l_type = F_RDLCK;
-    lock.l_start = offset;
-    status = fcntl(sfd, F_SETLKW, &lock);
-    if(status == -1){
-        perror("Error while obtaining read lock");
-        return 0;
-    }
-
-    rdb = read(sfd, &student, sizeof(struct Student));
-    if(rdb == -1){
-        perror("Error while reading student record from student file");
-        return 0;
-    }
-    else if(rdb==0){
-        write(cfd,"Wrong student ID ^",18);
-        rdb = read(cfd,rd,sizeof(rd));
-        return 0;
-    }
-    lock.l_type = F_UNLCK;
-    status = fcntl(sfd, F_SETLK, &lock);   
-    close(sfd);
-    
-    if(strcmp(student.access,"blocked")==0){
-       write(cfd,"Already blocked ^",17);
-       rdb = read(cfd,rd,sizeof(rd));
-       return 0;
-    } 
-    
-    
-    strcpy(student.access,"blocked");
-   
-    sfd = open("student",O_WRONLY);
-    if(sfd == -1){
-        perror("Error while opening student file");
-        return 0;
-    }
-    offset = lseek(sfd, (studentID-1) * sizeof(struct Student), SEEK_SET);
-    if(offset == -1){
-        perror("Error while seeking to student record");
-        return 0;
-    }
-
-    lock.l_type = F_WRLCK;
-    lock.l_start = offset;
-    status = fcntl(sfd, F_SETLKW, &lock);
-    if(status == -1){
-        perror("Error while obtaining write lock");
-        return 0;
-    }
-    
-    wrb = write(sfd, &student, sizeof(struct Student));
-    if(wrb == -1){
-        perror("Error while writing into student file");
-        return 0;            
-    }
-
-    lock.l_type = F_UNLCK;
-    fcntl(sfd, F_SETLKW, &lock);
-    close(sfd);
-
-    
-    wrb = write(cfd, "Student blocked successfully ^",30);
-    if(wrb == -1){
-        perror("Error while writing student blocking");
-        return 0;            
-    }
-    rdb = read(cfd,rd,sizeof(rd));
-    return 1; 
-}
-
-int activate_student(int cfd){
-    ssize_t rdb, wrb;             
-    int status,sfd;
-    char rd[1024], wr[10240]; 
-    char temp[1024];
-    struct Student student;
-    struct flock lock = {F_WRLCK, SEEK_SET, 0, sizeof(struct Student), getpid()};
-    
-    wrb = write(cfd,"Enter student id:",strlen("Enter student id:"));
-    if(wrb==-1){
-        perror("Error while writing");
-        return 0;
-    }
-
-    rdb = read(cfd,rd,sizeof(rd));
-    if(rdb==-1){
-        perror("Error reading student id");
-        return 0;
-    }
-
-    
-    char *position = strstr(rd, "MT-");
-    char *start = NULL;
-    int studentID;
-
-    if(position!=NULL) {
-        start = position + strlen("MT-");
-        studentID = atoi(start);
-    }
-    else{
-        write(cfd,"Wrong student ID ^",18);
-        rdb = read(cfd,rd,sizeof(rd));
-        return 0;
-    }
-
-    sfd = open("student",O_RDONLY);
-    int offset = lseek(sfd,(studentID-1)*sizeof(struct Student),SEEK_SET);
-    if(offset == -1){
-        perror("Error while seeking");
-        return 0;
-    }
-    lock.l_type = F_RDLCK;
-    lock.l_start = offset;
-    status = fcntl(sfd, F_SETLKW, &lock);
-    if(status == -1){
-        perror("Error while obtaining read lock");
-        return 0;
-    }
-
-    rdb = read(sfd, &student, sizeof(struct Student));
-    if(rdb == -1){
-        perror("Error while reading student record");
-        return 0;
-    }
-    else if(rdb==0){
-        write(cfd,"Wrong student ID ^",18);
-        rdb = read(cfd,rd,sizeof(rd));
-        return 0;
-    }
-    lock.l_type = F_UNLCK;
-    status = fcntl(sfd, F_SETLK, &lock);   
-    close(sfd);
-
-    if(strcmp(student.access,"activated")==0){
-       write(cfd,"Already active ^",17);
-       rdb = read(cfd,rd,sizeof(rd));
-       return 0;
-    } 
-    
-    strcpy(student.access,"activated");
-  
-    
-    sfd = open("student",O_WRONLY);
-    if(sfd == -1){
-        perror("Error while opening student file");
-        return 0;
-    }
-    offset = lseek(sfd, (studentID-1) * sizeof(struct Student), SEEK_SET);
-    if(offset == -1){
-        perror("Error while seeking");
-        return 0;
-    }
-
-    lock.l_type = F_WRLCK;
-    lock.l_start = offset;
-    status = fcntl(sfd, F_SETLKW, &lock);
-    if(status == -1){
-        perror("Error while obtaining write lock");
-        return 0;
-    }
-    
-    wrb = write(sfd, &student, sizeof(struct Student));
-    if(wrb == -1){
-        perror("Error while updating");
-        return 0;            
-    }
-
-    lock.l_type = F_UNLCK;
-    fcntl(sfd, F_SETLKW, &lock);
-    close(sfd);
-
-    wrb = write(cfd, "Student activated successfully ^",32);
-    if(wrb == -1){
-        perror("Error");
-        return 0;            
-    }
-    rdb = read(cfd,rd,sizeof(rd));  
-    return 1; 
-}
-
-
-int log_out(int cfd){
-    ssize_t rdb, wrb;             
-    char rd[1024], wr[1024]; 
-    write(cfd,"You have been logged out successfully ^",sizeof("""You have been logged out successfully ^"));
-    write(cfd,"^",1);
-    close(cfd);
-    return 0;
-
-}
-
-int get_student_details(int cfd)
-{
-    ssize_t rdb, wrb;             
-    char rd[1024], wr[1024]; 
-    char temp[1024];
-    struct Student student;
-    int sfd;
-    struct flock lock = {F_RDLCK, SEEK_SET, 0, sizeof(struct Student), getpid()};
-
-    wrb = write(cfd,"Enter student id:" , 17);
-    if (wrb == -1){
-        perror("Error while writing to client");
-        return false;
-    }
-    bzero(rd, sizeof(rd));
-    rdb = read(cfd, rd, sizeof(rd));
-    if (rdb == -1){
-        perror("Error reading student ID");
-        return false;
-    }
-    
-    sfd = open("student", O_RDONLY);
-    if (sfd == -1)
-    {
-        bzero(wr, sizeof(wr));
-        strcpy(wr, "Student id doesn't exists ^");
-        wrb = write(cfd, wr, strlen(wr));
-        if (wrb == -1)
-        {
-            perror("Error while writing message to client");
-            return false;
-        }
-        rdb = read(cfd,rd,sizeof(rd));  
-        return 0;
-    }
-
-    char *position = strstr(rd, "MT-");
-    char *start = NULL;
-    int studentID;
-    if(position!=NULL) {
-        start = position + strlen("MT-");
-        studentID = atoi(start);
-        
-    }
-    
-    off_t offset = lseek(sfd, (studentID-1) * sizeof(struct Student), SEEK_SET);
-    if (offset == -1)
-    {
-        perror("Error while seeking to student record ");
-        return false;
-    }
-
-    lock.l_start = offset;
-    int status = fcntl(sfd, F_SETLKW, &lock);
-    if (status == -1)
-    {
-        perror("Error while obtaining read lock on the student");
-        return false;
-    }
-
-    rdb = read(sfd, &student, sizeof(struct Student));
-    if (rdb == -1)
-    {
-        perror("Error reading student record");
-        return false;
-    }
-
-    lock.l_type = F_UNLCK;
-    fcntl(sfd, F_SETLK, &lock);
-    bzero(wr, sizeof(wr));
-
-    sprintf(wr, "********* Student Details *********  \n\tName: %s\n\tAge : %d\n\tEmail : %s\n\tAddress: %s\n\tLogin-id: %s", student.name, student.age,student.email,student.address,student.login_id);
-    strcat(wr,"^");
-
-    wrb = write(cfd, wr, strlen(wr));
-    if (wrb == -1)
-    {
-        perror("Error writing student info");
-        return false;
-    }
-    rdb = read(cfd,rd,sizeof(rd)); 
-
-    return true;
-}
-
-
-int get_faculty_details(int cfd)
-{
-    ssize_t rdb, wrb;             
-    char rd[1024], wr[1024]; 
-    char temp[1024];
-    struct Faculty faculty;
-    int ffd;
-    struct flock lock = {F_RDLCK, SEEK_SET, 0, sizeof(struct Faculty), getpid()};
-
-    wrb = write(cfd,"Enter Faculty ID:", strlen("Enter Faculty ID:"));
-    if (wrb == -1){
-        perror("Error while writing message to client");
-        return false;
-    }
-    bzero(rd, sizeof(rd));
-    rdb = read(cfd, rd, sizeof(rd));
-    if (rdb == -1){
-        perror("Error reading faculty ID");
-        return false;
-    }
-  
-
-    ffd = open("faculty", O_RDONLY);
-    if (ffd == -1)
-    {
-        
-        bzero(wr, sizeof(wr));
-        strcpy(wr, "Faculty id doesn't exists ^");
-        wrb = write(cfd, wr, strlen(wr));
-        if (wrb == -1)
-        {
-            perror("Error while writing message to client");
-            return false;
-        }
-        rdb = read(cfd,rd,sizeof(rd));
-        return 0;
-    }
-    char *position = strstr(rd, "F-");
-    char *start = NULL;
-    int facultyID;
-    if(position!=NULL) {
-        start = position + strlen("F-");
-        facultyID = atoi(start);
-        
-    }
-    
-    off_t offset = lseek(ffd, (facultyID-1) * sizeof(struct Faculty), SEEK_SET);
-    lock.l_start = offset;
-
-    int status = fcntl(ffd, F_SETLKW, &lock);
-    if (status == -1)
-    {
-        perror("Error while obtaining read lock");
-        return false;
-    }
-
-    rdb = read(ffd, &faculty, sizeof(struct Faculty));
-    if (rdb == -1)
-    {
-        perror("Error reading faculty record");
-        return false;
-    }
-
-    lock.l_type = F_UNLCK;
-    fcntl(ffd, F_SETLK, &lock);
-    bzero(wr, sizeof(wr));
-
-    sprintf(wr, "********* Faculty Details *********  \n\tName: %s\n\tDepartment : %s\n\tEmail : %s\n\tLogin-id: %s", faculty.name,faculty.department,faculty.email,faculty.login_id);
-    strcat(wr,"^");
-
-    wrb = write(cfd, wr, strlen(wr));
-    if (wrb == -1)
-    {
-        perror("Error writing faculty");
-        return 0;
-    }
-    read(cfd,rd,sizeof(rd)); 
-    
-    return 1;
-}
-
 int add_student(int cfd)
 {
     ssize_t rdb, wrb;
@@ -780,4 +382,404 @@ int add_faculty(int cfd)
     close(ffd);
     return newFaculty.id;
 }
+
+int get_student_details(int cfd)
+{
+    ssize_t rdb, wrb;             
+    char rd[1024], wr[1024]; 
+    char temp[1024];
+    struct Student student;
+    int sfd;
+    struct flock lock = {F_RDLCK, SEEK_SET, 0, sizeof(struct Student), getpid()};
+
+    wrb = write(cfd,"Enter student id:" , 17);
+    if (wrb == -1){
+        perror("Error while writing to client");
+        return false;
+    }
+    bzero(rd, sizeof(rd));
+    rdb = read(cfd, rd, sizeof(rd));
+    if (rdb == -1){
+        perror("Error reading student ID");
+        return false;
+    }
+    
+    sfd = open("student", O_RDONLY);
+    if (sfd == -1)
+    {
+        bzero(wr, sizeof(wr));
+        strcpy(wr, "Student id doesn't exists ^");
+        wrb = write(cfd, wr, strlen(wr));
+        if (wrb == -1)
+        {
+            perror("Error while writing message to client");
+            return false;
+        }
+        rdb = read(cfd,rd,sizeof(rd));  
+        return 0;
+    }
+
+    char *position = strstr(rd, "MT-");
+    char *start = NULL;
+    int studentID;
+    if(position!=NULL) {
+        start = position + strlen("MT-");
+        studentID = atoi(start);
+        
+    }
+    
+    off_t offset = lseek(sfd, (studentID-1) * sizeof(struct Student), SEEK_SET);
+    if (offset == -1)
+    {
+        perror("Error while seeking to student record ");
+        return false;
+    }
+
+    lock.l_start = offset;
+    int status = fcntl(sfd, F_SETLKW, &lock);
+    if (status == -1)
+    {
+        perror("Error while obtaining read lock on the student");
+        return false;
+    }
+
+    rdb = read(sfd, &student, sizeof(struct Student));
+    if (rdb == -1)
+    {
+        perror("Error reading student record");
+        return false;
+    }
+
+    lock.l_type = F_UNLCK;
+    fcntl(sfd, F_SETLK, &lock);
+    bzero(wr, sizeof(wr));
+
+    sprintf(wr, "********* Student Details *********  \n\tName: %s\n\tAge : %d\n\tEmail : %s\n\tAddress: %s\n\tLogin-id: %s", student.name, student.age,student.email,student.address,student.login_id);
+    strcat(wr,"^");
+
+    wrb = write(cfd, wr, strlen(wr));
+    if (wrb == -1)
+    {
+        perror("Error writing student info");
+        return false;
+    }
+    rdb = read(cfd,rd,sizeof(rd)); 
+
+    return true;
+}
+
+
+int get_faculty_details(int cfd)
+{
+    ssize_t rdb, wrb;             
+    char rd[1024], wr[1024]; 
+    char temp[1024];
+    struct Faculty faculty;
+    int ffd;
+    struct flock lock = {F_RDLCK, SEEK_SET, 0, sizeof(struct Faculty), getpid()};
+
+    wrb = write(cfd,"Enter Faculty ID:", strlen("Enter Faculty ID:"));
+    if (wrb == -1){
+        perror("Error while writing message to client");
+        return false;
+    }
+    bzero(rd, sizeof(rd));
+    rdb = read(cfd, rd, sizeof(rd));
+    if (rdb == -1){
+        perror("Error reading faculty ID");
+        return false;
+    }
+  
+
+    ffd = open("faculty", O_RDONLY);
+    if (ffd == -1)
+    {
+        
+        bzero(wr, sizeof(wr));
+        strcpy(wr, "Faculty id doesn't exists ^");
+        wrb = write(cfd, wr, strlen(wr));
+        if (wrb == -1)
+        {
+            perror("Error while writing message to client");
+            return false;
+        }
+        rdb = read(cfd,rd,sizeof(rd));
+        return 0;
+    }
+    char *position = strstr(rd, "F-");
+    char *start = NULL;
+    int facultyID;
+    if(position!=NULL) {
+        start = position + strlen("F-");
+        facultyID = atoi(start);
+        
+    }
+    
+    off_t offset = lseek(ffd, (facultyID-1) * sizeof(struct Faculty), SEEK_SET);
+    lock.l_start = offset;
+
+    int status = fcntl(ffd, F_SETLKW, &lock);
+    if (status == -1)
+    {
+        perror("Error while obtaining read lock");
+        return false;
+    }
+
+    rdb = read(ffd, &faculty, sizeof(struct Faculty));
+    if (rdb == -1)
+    {
+        perror("Error reading faculty record");
+        return false;
+    }
+
+    lock.l_type = F_UNLCK;
+    fcntl(ffd, F_SETLK, &lock);
+    bzero(wr, sizeof(wr));
+
+    sprintf(wr, "********* Faculty Details *********  \n\tName: %s\n\tDepartment : %s\n\tEmail : %s\n\tLogin-id: %s", faculty.name,faculty.department,faculty.email,faculty.login_id);
+    strcat(wr,"^");
+
+    wrb = write(cfd, wr, strlen(wr));
+    if (wrb == -1)
+    {
+        perror("Error writing faculty");
+        return 0;
+    }
+    read(cfd,rd,sizeof(rd)); 
+    
+    return 1;
+}
+
+
+
+int block_student(int cfd){
+    ssize_t rdb, wrb; 
+    int status,sfd;
+    char rd[1024], wr[1024],temp[1024];
+    struct Student student;
+    struct flock lock = {F_WRLCK, SEEK_SET, 0, sizeof(struct Student), getpid()};
+    wrb = write(cfd,"Enter student id to block:",strlen("Enter student id to block:"));
+    if(wrb==-1){
+        perror("Error writing to client");
+        return 0;
+    }
+
+    rdb = read(cfd,rd,sizeof(rd));
+    if(rdb==-1){
+        perror("Error reading student id");
+        return 0;
+    }
+
+    char *position = strstr(rd, "MT-");
+    char *start = NULL;
+    int studentID;
+
+    if(position!=NULL) {
+        start = position + strlen("MT-");
+        studentID = atoi(start);
+    }
+    else{
+        write(cfd,"Invalid student ID ^",sizeof("Invalid student ID ^"));
+        rdb = read(cfd,rd,sizeof(rd));
+        return 0;
+    }
+
+    
+    sfd = open("student",O_RDONLY);
+    int offset = lseek(sfd,(studentID-1)*sizeof(struct Student),SEEK_SET);
+    if(offset == -1){
+        perror("Error");
+    }
+    lock.l_type = F_RDLCK;
+    lock.l_start = offset;
+    status = fcntl(sfd, F_SETLKW, &lock);
+    if(status == -1){
+        perror("Error while obtaining read lock");
+        return 0;
+    }
+
+    rdb = read(sfd, &student, sizeof(struct Student));
+    if(rdb == -1){
+        perror("Error while reading student record from student file");
+        return 0;
+    }
+    else if(rdb==0){
+        write(cfd,"Wrong student ID ^",18);
+        rdb = read(cfd,rd,sizeof(rd));
+        return 0;
+    }
+    lock.l_type = F_UNLCK;
+    status = fcntl(sfd, F_SETLK, &lock);   
+    close(sfd);
+    
+    if(strcmp(student.access,"blocked")==0){
+       write(cfd,"Already blocked ^",17);
+       rdb = read(cfd,rd,sizeof(rd));
+       return 0;
+    } 
+    
+    
+    strcpy(student.access,"blocked");
+   
+    sfd = open("student",O_WRONLY);
+    if(sfd == -1){
+        perror("Error while opening student file");
+        return 0;
+    }
+    offset = lseek(sfd, (studentID-1) * sizeof(struct Student), SEEK_SET);
+    if(offset == -1){
+        perror("Error while seeking to student record");
+        return 0;
+    }
+
+    lock.l_type = F_WRLCK;
+    lock.l_start = offset;
+    status = fcntl(sfd, F_SETLKW, &lock);
+    if(status == -1){
+        perror("Error while obtaining write lock");
+        return 0;
+    }
+    
+    wrb = write(sfd, &student, sizeof(struct Student));
+    if(wrb == -1){
+        perror("Error while writing into student file");
+        return 0;            
+    }
+
+    lock.l_type = F_UNLCK;
+    fcntl(sfd, F_SETLKW, &lock);
+    close(sfd);
+
+    
+    wrb = write(cfd, "Student blocked successfully ^",30);
+    if(wrb == -1){
+        perror("Error while writing student blocking");
+        return 0;            
+    }
+    rdb = read(cfd,rd,sizeof(rd));
+    return 1; 
+}
+
+int activate_student(int cfd){
+    ssize_t rdb, wrb;             
+    int status,sfd;
+    char rd[1024], wr[10240]; 
+    char temp[1024];
+    struct Student student;
+    struct flock lock = {F_WRLCK, SEEK_SET, 0, sizeof(struct Student), getpid()};
+    
+    wrb = write(cfd,"Enter student id:",strlen("Enter student id:"));
+    if(wrb==-1){
+        perror("Error while writing");
+        return 0;
+    }
+
+    rdb = read(cfd,rd,sizeof(rd));
+    if(rdb==-1){
+        perror("Error reading student id");
+        return 0;
+    }
+
+    
+    char *position = strstr(rd, "MT-");
+    char *start = NULL;
+    int studentID;
+
+    if(position!=NULL) {
+        start = position + strlen("MT-");
+        studentID = atoi(start);
+    }
+    else{
+        write(cfd,"Wrong student ID ^",18);
+        rdb = read(cfd,rd,sizeof(rd));
+        return 0;
+    }
+
+    sfd = open("student",O_RDONLY);
+    int offset = lseek(sfd,(studentID-1)*sizeof(struct Student),SEEK_SET);
+    if(offset == -1){
+        perror("Error while seeking");
+        return 0;
+    }
+    lock.l_type = F_RDLCK;
+    lock.l_start = offset;
+    status = fcntl(sfd, F_SETLKW, &lock);
+    if(status == -1){
+        perror("Error while obtaining read lock");
+        return 0;
+    }
+
+    rdb = read(sfd, &student, sizeof(struct Student));
+    if(rdb == -1){
+        perror("Error while reading student record");
+        return 0;
+    }
+    else if(rdb==0){
+        write(cfd,"Wrong student ID ^",18);
+        rdb = read(cfd,rd,sizeof(rd));
+        return 0;
+    }
+    lock.l_type = F_UNLCK;
+    status = fcntl(sfd, F_SETLK, &lock);   
+    close(sfd);
+
+    if(strcmp(student.access,"activated")==0){
+       write(cfd,"Already active ^",17);
+       rdb = read(cfd,rd,sizeof(rd));
+       return 0;
+    } 
+    
+    strcpy(student.access,"activated");
+  
+    
+    sfd = open("student",O_WRONLY);
+    if(sfd == -1){
+        perror("Error while opening student file");
+        return 0;
+    }
+    offset = lseek(sfd, (studentID-1) * sizeof(struct Student), SEEK_SET);
+    if(offset == -1){
+        perror("Error while seeking");
+        return 0;
+    }
+
+    lock.l_type = F_WRLCK;
+    lock.l_start = offset;
+    status = fcntl(sfd, F_SETLKW, &lock);
+    if(status == -1){
+        perror("Error while obtaining write lock");
+        return 0;
+    }
+    
+    wrb = write(sfd, &student, sizeof(struct Student));
+    if(wrb == -1){
+        perror("Error while updating");
+        return 0;            
+    }
+
+    lock.l_type = F_UNLCK;
+    fcntl(sfd, F_SETLKW, &lock);
+    close(sfd);
+
+    wrb = write(cfd, "Student activated successfully ^",32);
+    if(wrb == -1){
+        perror("Error");
+        return 0;            
+    }
+    rdb = read(cfd,rd,sizeof(rd));  
+    return 1; 
+}
+
+
+int log_out(int cfd){
+    ssize_t rdb, wrb;             
+    char rd[1024], wr[1024]; 
+    write(cfd,"You have been logged out successfully ^",sizeof("""You have been logged out successfully ^"));
+    write(cfd,"^",1);
+    close(cfd);
+    return 0;
+
+}
+
+
 
